@@ -1,0 +1,34 @@
+app = 'kimai-time-tracker-lite'
+primary_region = 'sjc'
+
+[build]
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  min_machines_running = 1
+  max_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 100
+    soft_limit = 50
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[env]
+  TRUSTED_HOSTS = "kimai-timetracker-simple.fly.dev,localhost,127.0.0.1"
+  MAILER_FROM = "admin@kimai-timetracker-simple.fly.dev"
+  APP_ENV = "prod"
+  APP_SECRET = "kimai-fly-secret-2024"
+  MAILER_URL = "null://localhost"
+  DATABASE_URL = "sqlite:///opt/kimai/var/data/kimai.sqlite"
+
+[[mounts]]
+  source = "kimai_data"
+  destination = "/opt/kimai/var"

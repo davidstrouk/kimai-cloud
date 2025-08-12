@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  database:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=kimai
+      - MYSQL_USER=kimai
+      - MYSQL_PASSWORD=kimai123
+      - MYSQL_ROOT_PASSWORD=root123
+    volumes:
+      - kimai_database:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    healthcheck:
+      test: mysqladmin -p$$MYSQL_ROOT_PASSWORD ping -h localhost
+      interval: 20s
+      start_period: 10s
+      timeout: 10s
+      retries: 3
+
+  kimai:
+    image: kimai/kimai2:apache
+    environment:
+      - DATABASE_URL=mysql://kimai:kimai123@database:3306/kimai?charset=utf8mb4&serverVersion=8.0.0
+      - TRUSTED_HOSTS=localhost,127.0.0.1,kimai.local
+      - MAILER_FROM=admin@kimai.local
+    volumes:
+      - kimai_data:/opt/kimai/var
+    ports:
+      - "8080:8001"
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: wget --spider http://localhost:8001/ || exit 1
+      interval: 20s
+      start_period: 10s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  kimai_database:
+  kimai_data:
