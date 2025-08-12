@@ -44,10 +44,23 @@ create_or_reset_admin() {
       # Does the user exist?
       if /opt/kimai/bin/console kimai:user:list 2>/dev/null | awk '{print $1}' | grep -q "^${ADMIN_USER}$"; then
         echo "[render-entrypoint] Admin '${ADMIN_USER}' exists"
+        # Ensure user is active
+        /opt/kimai/bin/console kimai:user:activate "$ADMIN_USER" >/dev/null 2>&1 || true
         if [ -n "$ADMIN_PASSWORD" ]; then
-          if /opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" "$ADMIN_PASSWORD" >/dev/null 2>&1; then
+          # Try argument-based reset first
+          if out=$(/opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" "$ADMIN_PASSWORD" 2>&1); then
             echo "[render-entrypoint] Admin password reset"
             return 0
+          else
+            echo "[render-entrypoint] ERROR during reset-password (args): $out"
+            # Fallback: interactive reset by piping password twice
+            if out=$(printf "%s\n%s\n" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" | \
+                     /opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" 2>&1); then
+              echo "[render-entrypoint] Admin password reset (interactive fallback)"
+              return 0
+            else
+              echo "[render-entrypoint] ERROR during reset-password (interactive): $out"
+            fi
           fi
         fi
       else
