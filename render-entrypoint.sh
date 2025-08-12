@@ -47,20 +47,13 @@ create_or_reset_admin() {
         # Ensure user is active
         /opt/kimai/bin/console kimai:user:activate "$ADMIN_USER" >/dev/null 2>&1 || true
         if [ -n "$ADMIN_PASSWORD" ]; then
-          # Try argument-based reset first
-          if out=$(/opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" "$ADMIN_PASSWORD" 2>&1); then
-            echo "[render-entrypoint] Admin password reset"
+          # Set password interactively by piping it twice (compatible across Kimai versions)
+          if out=$(printf "%s\n%s\n" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" | \
+                   /opt/kimai/bin/console kimai:user:password "$ADMIN_USER" 2>&1); then
+            echo "[render-entrypoint] Admin password set"
             return 0
           else
-            echo "[render-entrypoint] ERROR during reset-password (args): $out"
-            # Fallback: interactive reset by piping password twice
-            if out=$(printf "%s\n%s\n" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" | \
-                     /opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" 2>&1); then
-              echo "[render-entrypoint] Admin password reset (interactive fallback)"
-              return 0
-            else
-              echo "[render-entrypoint] ERROR during reset-password (interactive): $out"
-            fi
+            echo "[render-entrypoint] ERROR during user:password (interactive): $out"
           fi
         fi
       else
@@ -70,6 +63,9 @@ create_or_reset_admin() {
           if out=$(printf "%s\n%s\n" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" | \
                    /opt/kimai/bin/console kimai:user:create "$ADMIN_USER" "$ADMIN_EMAIL" ROLE_SUPER_ADMIN 2>&1); then
             /opt/kimai/bin/console kimai:user:activate "$ADMIN_USER" >/dev/null 2>&1 || true
+            # Ensure password is set, in case create did not persist it
+            printf "%s\n%s\n" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" | \
+              /opt/kimai/bin/console kimai:user:password "$ADMIN_USER" >/dev/null 2>&1 || true
             echo "[render-entrypoint] Admin created"
             return 0
           else
