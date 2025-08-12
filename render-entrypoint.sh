@@ -63,7 +63,16 @@ create_or_reset_admin() {
           echo "[render-entrypoint] Admin created"
           return 0
         else
-          echo "[render-entrypoint] ERROR during user:create: $out"
+          echo "[render-entrypoint] ERROR during user:create (non-interactive): $out"
+          # Fallback: interactive create by piping password twice
+          if [ -n "$ADMIN_PASSWORD" ]; then
+            if printf "%s\n%s\n" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" | \
+               /opt/kimai/bin/console kimai:user:create "$ADMIN_USER" "$ADMIN_EMAIL" ROLE_SUPER_ADMIN >/dev/null 2>&1; then
+              /opt/kimai/bin/console kimai:user:activate "$ADMIN_USER" >/dev/null 2>&1 || true
+              echo "[render-entrypoint] Admin created (interactive fallback)"
+              return 0
+            fi
+          fi
         fi
       fi
     fi
