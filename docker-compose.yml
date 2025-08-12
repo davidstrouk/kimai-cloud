@@ -6,8 +6,8 @@ services:
     environment:
       - MYSQL_DATABASE=kimai
       - MYSQL_USER=kimai
-      - MYSQL_PASSWORD=kimai123
-      - MYSQL_ROOT_PASSWORD=root123
+      - MYSQL_PASSWORD=kimai_secure_2024
+      - MYSQL_ROOT_PASSWORD=root_secure_2024
     volumes:
       - kimai_database:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
@@ -21,10 +21,10 @@ services:
 
   kimai:
     image: kimai/kimai2:apache
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=mysql://kimai:kimai123@database:3306/kimai?charset=utf8mb4&serverVersion=8.0.0
-      - TRUSTED_HOSTS=localhost,127.0.0.1,kimai.local
-      - MAILER_FROM=admin@kimai.local
+      - DATABASE_URL=mysql://kimai:kimai_secure_2024@database:3306/kimai?charset=utf8mb4&serverVersion=8.0.0
     volumes:
       - kimai_data:/opt/kimai/var
     ports:

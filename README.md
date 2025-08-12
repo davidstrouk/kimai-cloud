@@ -5,7 +5,19 @@
 ### Access Information
 - **URL:** http://localhost:8080
 - **Admin Username:** admin
-- **Admin Password:** admin123
+- **Admin Password:** SecureKimai2024!
+
+### Setup Instructions
+
+1. **Copy environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Update .env file with your values:**
+   - Change `APP_SECRET` to a secure random string
+   - Update `KIMAI_ADMIN_PASSWORD` to your preferred password
+   - Modify other settings as needed
 
 ### Management Commands
 
