@@ -17,8 +17,8 @@ fi
 echo "[render-entrypoint] Using PORT=${PORT}"
 if [ -n "${DATABASE_URL:-}" ]; then
   # Extract host and db name for visibility
-  _db_host=$(echo "$DATABASE_URL" | awk -F'[@/:?]' '{print $5}')
-  _db_name=$(echo "$DATABASE_URL" | awk -F'[/?]' '{print $4}')
+  _db_host=$(echo "$DATABASE_URL" | sed -E 's|^[a-zA-Z0-9+.-]+://[^@]*@([^/:?]+).*|\1|')
+  _db_name=$(echo "$DATABASE_URL" | sed -E 's|^[a-zA-Z0-9+.-]+://[^/]+/([^/?#]+).*|\1|')
   echo "[render-entrypoint] DATABASE_URL present (host=${_db_host}, db=${_db_name})"
 else
   echo "[render-entrypoint] WARNING: DATABASE_URL is empty"
@@ -30,13 +30,17 @@ ADMIN_PASSWORD=${KIMAI_ADMIN_PASSWORD:-}
 
 create_or_reset_admin() {
   local tries=0
-  local max_tries=${ADMIN_RETRIES:-20}
+  local max_tries=${ADMIN_RETRIES:-60}
   local wait_sec=${ADMIN_WAIT_SECONDS:-5}
+
+  db_ready() {
+    /opt/kimai/bin/console doctrine:query:sql "SELECT 1" >/dev/null 2>&1
+  }
 
   while [ $tries -lt $max_tries ]; do
     tries=$((tries+1))
-    # Ensure console is callable and DB is up enough for console commands
-    if /opt/kimai/bin/console -V >/dev/null 2>&1; then
+    # Ensure console is callable and DB is ready for console commands
+    if /opt/kimai/bin/console -V >/dev/null 2>&1 && db_ready; then
       # Does the user exist?
       if /opt/kimai/bin/console kimai:user:list 2>/dev/null | awk '{print $1}' | grep -q "^${ADMIN_USER}$"; then
         echo "[render-entrypoint] Admin '${ADMIN_USER}' exists"
@@ -48,13 +52,18 @@ create_or_reset_admin() {
         fi
       else
         echo "[render-entrypoint] Creating admin '${ADMIN_USER}'"
-        if /opt/kimai/bin/console kimai:user:create "$ADMIN_USER" "$ADMIN_EMAIL" ROLE_SUPER_ADMIN --no-interaction >/dev/null 2>&1; then
+        # Try non-interactive create first, then set password
+        if out=$(/opt/kimai/bin/console kimai:user:create "$ADMIN_USER" "$ADMIN_EMAIL" ROLE_SUPER_ADMIN --no-interaction 2>&1); then
           /opt/kimai/bin/console kimai:user:activate "$ADMIN_USER" >/dev/null 2>&1 || true
           if [ -n "$ADMIN_PASSWORD" ]; then
-            /opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" "$ADMIN_PASSWORD" >/dev/null 2>&1 || true
+            if ! /opt/kimai/bin/console kimai:user:reset-password "$ADMIN_USER" "$ADMIN_PASSWORD" >/dev/null 2>&1; then
+              echo "[render-entrypoint] WARN: reset-password failed after create"
+            fi
           fi
           echo "[render-entrypoint] Admin created"
           return 0
+        else
+          echo "[render-entrypoint] ERROR during user:create: $out"
         fi
       fi
     fi
@@ -69,8 +78,8 @@ create_or_reset_admin() {
 /entrypoint.sh &
 KIMAI_PID=$!
 
-# Give Kimai a head start before attempting admin ops
-sleep 10
+# Give Kimai a head start before attempting admin ops (allow DB migrations)
+sleep 20
 create_or_reset_admin || true
 
 # Wait for the main process
